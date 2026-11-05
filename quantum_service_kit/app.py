@@ -5,8 +5,10 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
+from faststream import AckPolicy
 from faststream.kafka import KafkaBroker
 
 from quantum_common.db import Database
@@ -25,6 +27,16 @@ def setup_logging(level: str) -> None:
 def make_broker(bootstrap: str, client_id: str) -> KafkaBroker:
     # acks="all" + идемпотентный продюсер: подтверждённое событие не потеряется и не задвоится при ретрае.
     return KafkaBroker(bootstrap, client_id=client_id, acks="all", enable_idempotence=True)
+
+
+def consumer(group_id: str) -> dict[str, Any]:
+    """Общие параметры подписчика Kafka.
+
+    * earliest — новая группа читает топик с начала: события, опубликованные до первого
+      запуска сервиса, не пропадут (дальше Kafka помнит позицию группы сама);
+    * NACK_ON_ERROR — если обработчик упал, сообщение не подтверждается и придёт снова.
+    """
+    return {"group_id": group_id, "ack_policy": AckPolicy.NACK_ON_ERROR, "auto_offset_reset": "earliest"}
 
 
 def create_app(
