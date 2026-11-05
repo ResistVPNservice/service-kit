@@ -33,6 +33,9 @@ class DbSettings(KafkaSettings):
 
 class TelegramSettings(BaseServiceSettings):
     bot_token: str
+    # Прокси до api.telegram.org, если Telegram на сервере работает плохо (например, в РФ):
+    # socks5://tg-proxy:1080 — встроенный туннель через свой VLESS-сервер (см. README), или любой socks5/http.
+    telegram_proxy: str = ""
     admin_ids: CsvInts = []
     public_base_url: str = ""
     support_url: str = "https://t.me/your_support"
