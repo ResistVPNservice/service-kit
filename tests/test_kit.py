@@ -5,11 +5,11 @@ from uuid import uuid4
 import httpx
 from sqlalchemy import MetaData
 
-from quantum_contracts import TrialActivated
-from quantum_service_kit.app import consumer, create_app
-from quantum_service_kit.db import Database, as_utc
-from quantum_service_kit.messaging import Inbox, Outbox
-from quantum_service_kit.settings import split_csv
+from resist_contracts import TrialActivated
+from resist_service_kit.app import consumer, create_app
+from resist_service_kit.db import Database, as_utc
+from resist_service_kit.messaging import Inbox, Outbox
+from resist_service_kit.settings import split_csv
 
 
 class FakeBroker:

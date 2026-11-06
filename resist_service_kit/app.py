@@ -18,8 +18,8 @@ from faststream.kafka import KafkaBroker
 from faststream.kafka.prometheus import KafkaPrometheusMiddleware
 from prometheus_client import REGISTRY, make_asgi_app
 
-from quantum_service_kit.db import Database
-from quantum_service_kit.messaging import Outbox
+from resist_service_kit.db import Database
+from resist_service_kit.messaging import Outbox
 
 BackgroundTask = Callable[[], Awaitable[None]]
 

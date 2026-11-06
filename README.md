@@ -1,6 +1,6 @@
 # service-kit
 
-Каркас микросервиса QuantumVPN — чтобы каждый сервис не писал одно и то же.
+Каркас микросервиса ResistVPN — чтобы каждый сервис не писал одно и то же.
 
 | Модуль | Что даёт |
 |---|---|
@@ -12,5 +12,5 @@
 Метрики: `outbox_published_total{topic}`, `outbox_relay_errors_total`, `outbox_last_batch_size`, `inbox_duplicates_total`, плюс `faststream_*` по каждому топику.
 
 ```toml
-dependencies = ["quantum-service-kit @ git+https://github.com/ResistVPNservice/service-kit.git@v1.0.0"]
+dependencies = ["resist-service-kit @ git+https://github.com/ResistVPNservice/service-kit.git@v1.0.0"]
 ```

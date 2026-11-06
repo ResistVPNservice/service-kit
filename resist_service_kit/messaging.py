@@ -18,8 +18,8 @@ from prometheus_client import Counter, Gauge
 from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from quantum_contracts.events import Event, utcnow
-from quantum_service_kit.db import BigIntPK, Database
+from resist_contracts.events import Event, utcnow
+from resist_service_kit.db import BigIntPK, Database
 
 log = logging.getLogger(__name__)
 
