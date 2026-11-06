@@ -1,4 +1,9 @@
-"""Каркас сервиса: FastAPI (HTTP) + FastStream (Kafka) + Postgres + outbox в одном процессе."""
+"""Каркас сервиса: FastAPI (HTTP) + FastStream (Kafka) + Postgres + outbox + метрики в одном процессе.
+
+Каждый сервис получает из коробки:
+  GET /health   — liveness/readiness-проба для Kubernetes
+  GET /metrics  — метрики Prometheus: HTTP не считаем, а Kafka-сообщения и outbox — да
+"""
 
 import asyncio
 import contextlib
@@ -10,9 +15,11 @@ from typing import Any
 from fastapi import FastAPI
 from faststream import AckPolicy
 from faststream.kafka import KafkaBroker
+from faststream.kafka.prometheus import KafkaPrometheusMiddleware
+from prometheus_client import REGISTRY, make_asgi_app
 
-from quantum_common.db import Database
-from quantum_common.messaging import Outbox
+from quantum_service_kit.db import Database
+from quantum_service_kit.messaging import Outbox
 
 BackgroundTask = Callable[[], Awaitable[None]]
 
@@ -26,7 +33,14 @@ def setup_logging(level: str) -> None:
 
 def make_broker(bootstrap: str, client_id: str) -> KafkaBroker:
     # acks="all" + идемпотентный продюсер: подтверждённое событие не потеряется и не задвоится при ретрае.
-    return KafkaBroker(bootstrap, client_id=client_id, acks="all", enable_idempotence=True)
+    # KafkaPrometheusMiddleware: сколько сообщений обработано/упало и за сколько — по каждому топику.
+    return KafkaBroker(
+        bootstrap,
+        client_id=client_id,
+        acks="all",
+        enable_idempotence=True,
+        middlewares=[KafkaPrometheusMiddleware(registry=REGISTRY, app_name=client_id)],
+    )
 
 
 def consumer(group_id: str) -> dict[str, Any]:
@@ -83,6 +97,8 @@ def create_app(
             log.info("%s stopped", name)
 
     app = FastAPI(title=name, lifespan=lifespan)
+
+    app.mount("/metrics", make_asgi_app(REGISTRY))
 
     @app.get("/health")
     async def health() -> dict[str, str]:

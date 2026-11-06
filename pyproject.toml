@@ -1,9 +1,10 @@
 [project]
-name = "quantum-common"
-version = "0.1.0"
-description = "QuantumVPN: контракты событий, БД, outbox/inbox, Kafka, настройки"
+name = "quantum-service-kit"
+version = "1.0.0"
+description = "QuantumVPN: каркас микросервиса — FastAPI, FastStream/Kafka, Postgres, outbox/inbox, метрики"
 requires-python = ">=3.12"
 dependencies = [
+    "quantum-contracts @ git+https://github.com/ResistVPNservice/contracts.git@v1.0.0",
     "faststream[kafka]>=0.7,<0.8",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
@@ -12,11 +13,35 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.6",
     "httpx>=0.27",
+    "prometheus-client>=0.20",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "aiosqlite>=0.20", "ruff>=0.6"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.metadata]
+allow-direct-references = true  # зависимости на наши библиотеки — из git по тегу
+
 [tool.hatch.build.targets.wheel]
-packages = ["quantum_common"]
+packages = ["quantum_service_kit"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "RUF"]
+# RUF001-3: кириллица в строках — это нормально; RUF012: pydantic сам копирует изменяемые дефолты
+ignore = ["RUF001", "RUF002", "RUF003", "RUF012"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["quantum_contracts", "quantum_service_kit", "tg_kit", "quantum_service_kit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

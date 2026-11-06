@@ -14,13 +14,19 @@ import logging
 from uuid import UUID
 
 from faststream.kafka import KafkaBroker
+from prometheus_client import Counter, Gauge
 from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from quantum_common.db import BigIntPK, Database
-from quantum_common.events import Event, utcnow
+from quantum_contracts.events import Event, utcnow
+from quantum_service_kit.db import BigIntPK, Database
 
 log = logging.getLogger(__name__)
+
+OUTBOX_PUBLISHED = Counter("outbox_published_total", "Событий отправлено из outbox в Kafka", ["topic"])
+OUTBOX_ERRORS = Counter("outbox_relay_errors_total", "Неудачных попыток отправить outbox в Kafka")
+OUTBOX_LAST_BATCH = Gauge("outbox_last_batch_size", "Сколько событий было в последней отправленной пачке")
+INBOX_DUPLICATES = Counter("inbox_duplicates_total", "Повторно доставленных и пропущенных событий")
 
 
 class Outbox:
@@ -56,8 +62,10 @@ class Outbox:
             ).all()
             for row in rows:
                 await broker.publish(json.loads(row.payload), topic=row.topic, key=row.key.encode())
+                OUTBOX_PUBLISHED.labels(row.topic).inc()
             if rows:
                 await session.execute(delete(t).where(t.c.id.in_([r.id for r in rows])))
+        OUTBOX_LAST_BATCH.set(len(rows))
         return len(rows)
 
     async def run(self, db: Database, broker: KafkaBroker, interval: float = 0.3) -> None:
@@ -67,6 +75,7 @@ class Outbox:
             except asyncio.CancelledError:
                 raise
             except Exception:
+                OUTBOX_ERRORS.inc()
                 log.exception("outbox relay failed, will retry")
                 sent = 0
             if sent == 0:
@@ -91,6 +100,7 @@ class Inbox:
         key = str(event_id)
         found = await session.scalar(select(self.table.c.event_id).where(self.table.c.event_id == key))
         if found is not None:
+            INBOX_DUPLICATES.inc()
             return True
         await session.execute(insert(self.table).values(event_id=key, processed_at=utcnow()))
         return False
