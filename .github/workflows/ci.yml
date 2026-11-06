@@ -10,3 +10,5 @@ jobs:
   ci:
     uses: ResistVPNservice/ci-templates/.github/workflows/python-library.yml@v1
     secrets: inherit
+    permissions:
+      contents: write   # job release создаёт GitHub Release по тегу
