@@ -3,6 +3,7 @@
 Каждый сервис получает из коробки:
   GET /health   — liveness/readiness-проба для Kubernetes
   GET /metrics  — метрики Prometheus: HTTP не считаем, а Kafka-сообщения и outbox — да
+  логи         — JSON (или текст при LOG_FORMAT=text) с контекстом tg_id/event_id, см. logs.py
 """
 
 import asyncio
@@ -19,16 +20,16 @@ from faststream.kafka.prometheus import KafkaPrometheusMiddleware
 from prometheus_client import REGISTRY, make_asgi_app
 
 from resist_service_kit.db import Database
+from resist_service_kit.logs import KafkaLogContextMiddleware, http_log_middleware
+from resist_service_kit.logs import setup_logging as _setup_logging
 from resist_service_kit.messaging import Outbox
 
 BackgroundTask = Callable[[], Awaitable[None]]
 
 
-def setup_logging(level: str) -> None:
-    logging.basicConfig(
-        level=level.upper(),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+def setup_logging(level: str, service: str | None = None) -> None:
+    """Логи процесса: JSON или текст (LOG_FORMAT), uvicorn/FastStream/aiogram — через тот же обработчик."""
+    _setup_logging(level, service)
 
 
 def make_broker(bootstrap: str, client_id: str) -> KafkaBroker:
@@ -39,7 +40,9 @@ def make_broker(bootstrap: str, client_id: str) -> KafkaBroker:
         client_id=client_id,
         acks="all",
         enable_idempotence=True,
-        middlewares=[KafkaPrometheusMiddleware(registry=REGISTRY, app_name=client_id)],
+        # KafkaLogContextMiddleware: в логах обработки события сами появляются topic, tg_id, event_id, grant_id.
+        middlewares=[KafkaPrometheusMiddleware(registry=REGISTRY, app_name=client_id), KafkaLogContextMiddleware],
+        logger=logging.getLogger("kafka"),
     )
 
 
@@ -66,7 +69,7 @@ def create_app(
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        setup_logging(log_level)
+        setup_logging(log_level, name)
         log = logging.getLogger(name)
         if db is not None:
             await db.create_all()
@@ -97,6 +100,7 @@ def create_app(
             log.info("%s stopped", name)
 
     app = FastAPI(title=name, lifespan=lifespan)
+    app.middleware("http")(http_log_middleware)
 
     app.mount("/metrics", make_asgi_app(REGISTRY))
 
